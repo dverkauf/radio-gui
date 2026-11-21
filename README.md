@@ -97,4 +97,8 @@ Internet and Podcasts include a smaller Find action below the source tabs.
 Search uses the multilingual touch keyboard. Save a station or subscribe to a
 podcast explicitly, then return to presets to play. Search and subscription
 fetches run in an owned PHP worker alongside playback. See DISCOVERY.md.
-FM/DAB+ scan screens and remembered DAB+ reception regions are the next stage.
+FM/DAB+ include secondary scan screens with cancellable capture and explicit saving.
+DAB+ remembers a configured reception location. See SCANNING.md.
+
+FM identification is separate from saving. Manage presets provides confirmed
+source-specific deletion and podcast unsubscribe. See PRESET-MANAGEMENT.md.

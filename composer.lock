@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a4983d8044499040acd63b5d152da9e2",
+    "content-hash": "acb35f217b31238a3265ad2dc53efa18",
     "packages": [
         {
             "name": "dverkauf/radio-lib",
@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:dverkauf/radio-lib.git",
-                "reference": "306913e"
+                "reference": "15d41d6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/dverkauf/radio-lib/zipball/306913e",
-                "reference": "306913e",
+                "url": "https://api.github.com/repos/dverkauf/radio-lib/zipball/15d41d6",
+                "reference": "15d41d6",
                 "shasum": ""
             },
             "require": {
@@ -47,7 +47,7 @@
                 "source": "https://github.com/dverkauf/radio-lib/tree/main",
                 "issues": "https://github.com/dverkauf/radio-lib/issues"
             },
-            "time": "2026-11-20T17:09:01+00:00"
+            "time": "2026-11-21T17:35:42+00:00"
         },
         {
             "name": "psr/container",

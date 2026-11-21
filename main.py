@@ -64,6 +64,16 @@ def main() -> int:
             engine.rootContext().setContextProperty('discoveryBridge', discovery)
             discovery.saved.connect(bridge.refreshCatalogue)
             app.aboutToQuit.connect(discovery.shutdown)
+            from scan_bridge import ScanBridge
+            scans = ScanBridge(args.config_dir.resolve(), bridge, app)
+            engine.rootContext().setContextProperty('scanBridge', scans)
+            scans.saved.connect(bridge.refreshCatalogue)
+            app.aboutToQuit.connect(scans.shutdown)
+            from preset_bridge import PresetBridge
+            presets = PresetBridge(args.config_dir.resolve(), bridge, app)
+            engine.rootContext().setContextProperty('presetBridge', presets)
+            presets.saved.connect(bridge.refreshCatalogue)
+            app.aboutToQuit.connect(presets.shutdown)
     engine.setInitialProperties({'windowed': args.windowed, 'backendName': app.platformName(),
                                  'contentRotation': args.rotation})
     scene = 'Radio.qml' if args.radio else 'Internet.qml' if args.internet else 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'
