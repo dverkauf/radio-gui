@@ -12,7 +12,7 @@ try {
     if ($bytes===false || strlen($bytes)>8192) { throw new RuntimeException('Oversized preset request.'); }
     $request=json_decode($bytes,true,16,JSON_THROW_ON_ERROR);
     $source=$request['source']??'';$action=$request['action']??'';
-    if (!in_array($source,['fm','dab','internet','podcast'],true) || !in_array($action,['list','delete'],true)) { throw new RuntimeException('Invalid preset request.'); }
+    if (!in_array($source,['fm','dab','internet','podcast'],true) || !in_array($action,['list','delete','move'],true)) { throw new RuntimeException('Invalid preset request.'); }
     if ($source==='podcast') {
         $podcasts=new SavedPodcasts($directory);
         if ($podcasts->error()!==null) { throw new RuntimeException($podcasts->error()); }
@@ -22,8 +22,15 @@ try {
         if (isset($catalogue['errors'][$source])) { throw new RuntimeException($catalogue['errors'][$source]); }
         $rows=array_values(array_filter($catalogue['stations'],static fn($row):bool=>$row['source']===$source));
     }
-    if ($action==='list') {
-        $response=['type'=>'presets','items'=>array_map(static fn($row):array=>['key'=>$row['id'],'name'=>$row['name'],'detail'=>$row['detail']??''], $rows)];
+    $order = new PresetOrder($directory);
+    $rows = $order->apply($source, $rows, true);
+    if ($action === 'move') {
+        if (!is_string($request['key'] ?? null) || !is_int($request['direction'] ?? null)
+            || !is_string($request['revision'] ?? null)) { throw new RuntimeException('Invalid preset move request.'); }
+        $rows = $order->move($source, $rows, $request['key'], $request['direction'], $request['revision']);
+    }
+    if ($action==='list' || $action==='move') {
+        $response=['type'=>$action==='move' ? 'ordered' : 'presets','revision'=>PresetOrder::revision($rows),'items'=>array_map(static fn($row):array=>['key'=>$row['id'],'name'=>$row['name'],'detail'=>$row['detail']??''], $rows)];
     } else {
         $key=$request['key']??null;
         $allowed=array_column($rows,null,'id');
@@ -45,7 +52,8 @@ try {
                 (new Radio\Podcast\JsonSubscriptionRepository($directory))->unsubscribe($key);
                 break;
         }
-        $response=['type'=>'deleted','key'=>$key,'name'=>$allowed[$key]['name']];
+        $remaining = array_values(array_filter($rows, static fn($row): bool => $row['id'] !== $key));
+        $response=['type'=>'deleted','key'=>$key,'name'=>$allowed[$key]['name'], 'revision'=>PresetOrder::revision($remaining)];
     }
     echo json_encode($response,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE),"\n";
 } catch(Throwable $error) {

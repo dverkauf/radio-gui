@@ -10,6 +10,7 @@ class PresetBridge(DiscoveryBridge):
         command = process_command or ['php', str(Path(__file__).with_name('backend') / 'presets.php'), str(directory)]
         super().__init__(directory, parent, process_command=command)
         self._playback = playback
+        self._revision = ""
 
     @Slot(str)
     def open(self, source):
@@ -21,8 +22,8 @@ class PresetBridge(DiscoveryBridge):
 
     def _start(self, request):
         super()._start(request)
-        self._saving = request['action'] == 'delete'
-        self._message = 'Removing preset…' if self._saving else 'Loading presets…'
+        self._saving = request['action'] in ('delete', 'move')
+        self._message = 'Updating presets…' if self._saving else 'Loading presets…'
         self.changed.emit()
 
     @Slot(int, bool)
@@ -36,6 +37,15 @@ class PresetBridge(DiscoveryBridge):
         self._start({'action':'delete','source':self._source,'key':self._items[index]['key'],
                      'remove_progress':bool(remove_progress)})
 
+    @Slot(int, int)
+    def move(self, index, direction):
+        if (self._busy or direction not in (-1, 1) or not 0 <= index < len(self._items)
+                or not 0 <= index + direction < len(self._items)):
+            return
+        self._start({'action': 'move', 'source': self._source,
+                     'key': self._items[index]['key'], 'direction': direction,
+                     'revision': self._revision})
+
     def _finished(self, code, status):
         if not self._busy:
             return
@@ -47,15 +57,20 @@ class PresetBridge(DiscoveryBridge):
         changed = False
         try:
             msg = json.loads(self._output)
-            if code == 0 and msg.get('type') == 'presets':
+            if not isinstance(msg, dict): raise ValueError()
+            if code == 0 and msg.get('type') in ('presets', 'ordered'):
                 items = msg['items']
                 if not isinstance(items,list) or len(items)>1000 or any(not isinstance(i,dict)
                     or any(not isinstance(i.get(k),str) for k in ('key','name','detail')) for i in items):
                     raise ValueError()
+                if not isinstance(msg.get('revision'), str): raise ValueError()
                 self._items = items
-                self._message = 'Choose Delete/Unsubscribe, then confirm. Everyday station taps still start playback.'
+                self._revision = msg['revision']
+                changed = msg['type'] == 'ordered'
+                self._message = 'Order saved.' if changed else 'Move presets up or down. Stop playback before deleting.'
             elif code == 0 and msg.get('type') == 'deleted' and isinstance(msg.get('key'),str):
                 self._items = [i for i in self._items if i['key'] != msg['key']]
+                self._revision = msg.get('revision', '')
                 self._message = 'Removed: ' + str(msg.get('name','preset'))
                 changed = True
             elif msg.get('type') == 'error' and isinstance(msg.get('message'),str):

@@ -37,3 +37,30 @@ suite and offscreen startup. Native tests use temporary catalogues/fake workers;
 manual tests must verify Identify leaves presets unchanged until Save, review of
 RDS info, source-specific delete confirmation/cancel, retained DAB neighbours and
 unsubscribe with retained/removed progress.
+
+## Preset ordering
+
+Use Move up and Move down under Manage presets (or Manage subscriptions). The
+order is remembered independently for FM, DAB+, Internet and podcast subscriptions,
+and is applied on startup and catalogue refresh. Episode chronology is unchanged.
+The moved row is outlined and kept visible. End-of-list moves are disabled.
+
+Ordering works during playback and refreshes the main list after acknowledgement;
+it does not stop or restart the current session or change volume. Deleting still
+requires playback to stop and a separate confirmation.
+
+Preferences use stable preset IDs in `~/.radio/gui-preset-order.json`, separate
+from library catalogues. Duplicate station names can be ordered independently.
+New presets follow existing ordered entries. Deleted IDs are ignored; a later
+move prunes absent IDs for that source. Re-adding exactly the same ID can restore
+its old position until such pruning. CLI catalogue ordering is unchanged.
+
+Writes use a private atomic replacement and a nonblocking advisory lock. Stale
+list revisions are rejected: reopen Manage presets if another editor changed the
+list. A malformed preference file is preserved; listening falls back to catalogue
+order, while management reports the error instead of overwriting it. External
+catalogue writers should not run concurrently with management operations.
+
+Native checks: `test_preset_order.py` covers preference integrity and startup/reload
+integration. `test_preset_order_bridge.py` covers acknowledged updates and playback
+preservation. Run the full suite before committing.

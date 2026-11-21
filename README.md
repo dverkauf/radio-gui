@@ -104,3 +104,6 @@ FM identification is separate from saving. Manage presets provides confirmed
 source-specific deletion and podcast unsubscribe. See PRESET-MANAGEMENT.md.
 
 DAB+ scan plans can be edited in the secondary [Reception locations screen](RECEPTION-LOCATIONS.md).
+
+Manage presets also offers **Move up / Move down**, with a remembered order per
+source. See [preset management](PRESET-MANAGEMENT.md#preset-ordering).

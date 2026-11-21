@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/PresetOrder.php';
+
 use Radio\Podcast\EpisodeSelectionResolver;
 use Radio\Podcast\JsonSubscriptionRepository;
 
@@ -11,9 +13,11 @@ final class SavedPodcasts
     public const PAGE_SIZE = 40;
     private array $subscriptions = [];
     private ?string $error = null;
+    private string $directory;
 
     public function __construct(string $directory)
     {
+        $this->directory = $directory;
         // Preserve read-only empty startup: the repository's lock is unnecessary
         // until a saved catalogue exists. Existing stores retain library locking.
         if (!file_exists($directory . '/podcasts.json')) { return; }
@@ -31,10 +35,10 @@ final class SavedPodcasts
 
     public function summaries(): array
     {
-        return array_map(static fn($s): array => [
+        return (new PresetOrder($this->directory))->apply('podcast', array_map(static fn($s): array => [
             'id' => $s->id(), 'name' => self::label($s->name),
             'detail' => count($s->feed->episodes) . ' saved episodes',
-        ], array_values($this->subscriptions));
+        ], array_values($this->subscriptions)));
     }
 
     public function page(string $feed, int $page): array

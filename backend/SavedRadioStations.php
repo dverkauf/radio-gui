@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/PresetOrder.php';
+
 use Radio\Dab\StationCatalogue as DabCatalogue;
 use Radio\Fm\StationCache;
 use Radio\Internet\StationCatalogue as InternetCatalogue;
@@ -51,7 +53,7 @@ final class SavedRadioStations
                     $entries[$id] = ['id' => $id, 'source' => $source, 'name' => $station['name'],
                         'detail' => $detail, 'selection' => $selection];
                 }
-                array_push($stations, ...array_values($entries));
+                array_push($stations, ...(new PresetOrder($directory))->apply($source, array_values($entries)));
             } catch (Throwable $error) {
                 // An unreadable FM/DAB catalogue must not disable another source.
                 $errors[$source] = substr($error->getMessage(), 0, 1000);

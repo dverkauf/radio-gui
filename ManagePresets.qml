@@ -6,16 +6,17 @@ Rectangle {
     property bool opened: false
     property string source: "internet"
     property string confirmKey: ""
+    property string movedKey: ""
     readonly property bool canRemove: ["idle", "stopped", "completed"].indexOf(radioBridge.state) >= 0
     visible: opened; color: "#111922"
     function open(sourceName) {
-        source = sourceName; confirmKey = ""; removeProgress.checked = false
+        source = sourceName; confirmKey = ""; movedKey = ""; removeProgress.checked = false
         presetBridge.open(sourceName); opened = true
     }
     MouseArea { anchors.fill: parent }
     component Action: Button {
         id: button
-        focusPolicy: Qt.NoFocus; font.pixelSize: 22
+        focusPolicy: Qt.NoFocus; font.pixelSize: 19
         contentItem: Text {
             text: button.text; font: button.font; textFormat: Text.PlainText
             color: "#edf2f5"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
@@ -30,7 +31,7 @@ Rectangle {
     }
     Text {
         x: 32; y: 96; width: 920; height: 60; textFormat: Text.PlainText
-        text: panel.canRemove ? presetBridge.message : "Stop playback before deleting a preset or subscription."
+        text: presetBridge.message
         color: "#a3e4ca"; font.pixelSize: 20; wrapMode: Text.WordWrap
     }
     Action { x: 1008; y: 96; width: 240; height: 60; text: "Stop playback"; enabled: !panel.canRemove; onClicked: radioBridge.stop() }
@@ -41,6 +42,16 @@ Rectangle {
         text: "Also delete this podcast's saved listening progress (otherwise kept)"
         font.pixelSize: 21
     }
+    Connections {
+        target:presetBridge
+        function onSaved() {
+            if (!panel.opened || panel.movedKey === "") return
+            Qt.callLater(function() {
+                for(var i=0;i<presetBridge.items.length;++i)
+                    if(presetBridge.items[i].key===panel.movedKey) {presets.positionViewAtIndex(i,ListView.Contain);break}
+            })
+        }
+    }
     ListView {
         id: presets
         x: 32; y: 234; width: 1216; height: 454; spacing: 12; clip: true; model: presetBridge.items
@@ -48,14 +59,25 @@ Rectangle {
             required property var modelData
             required property int index
             width: presets.width; height: 112; radius: 12; color: "#1c2934"
-            Text { x: 16; y: 12; width: parent.width - 430; height: 36; text: modelData.name; textFormat: Text.PlainText; color: "#edf2f5"; font.pixelSize: 23; elide: Text.ElideRight }
+            border.color: panel.movedKey === modelData.key ? "#a3e4ca" : "transparent"; border.width:2
+            Text { x: 16; y: 12; width: parent.width - 740; height: 36; text: modelData.name; textFormat: Text.PlainText; color: "#edf2f5"; font.pixelSize: 23; elide: Text.ElideRight }
             Text {
-                x: 16; y: 56; width: parent.width - 430; height: 44
+                x: 16; y: 56; width: parent.width - 740; height: 44
                 text: panel.confirmKey === modelData.key ? "Confirm removal of this named preset/subscription?" : modelData.detail
                 textFormat: Text.PlainText; color: "#aabcc9"; font.pixelSize: 18; wrapMode: Text.WordWrap
             }
             Action {
-                anchors.right: parent.right; anchors.rightMargin: 172; y: 20; width: 236; height: 72
+                anchors.right: parent.right; anchors.rightMargin: 568; y:20; width:148; height:72
+                text:"Move up"; enabled:!presetBridge.busy && index > 0
+                onClicked:{panel.confirmKey="";panel.movedKey=modelData.key;presetBridge.move(index,-1)}
+            }
+            Action {
+                anchors.right: parent.right; anchors.rightMargin: 408; y:20; width:148; height:72
+                text:"Move down"; enabled:!presetBridge.busy && index + 1 < presetBridge.items.length
+                onClicked:{panel.confirmKey="";panel.movedKey=modelData.key;presetBridge.move(index,1)}
+            }
+            Action {
+                anchors.right: parent.right; anchors.rightMargin: 172; y: 20; width: 224; height: 72
                 enabled: !presetBridge.busy && panel.canRemove
                 text: panel.confirmKey === modelData.key ? "Confirm removal" : panel.source === "podcast" ? "Unsubscribe" : "Delete"
                 onClicked: {
