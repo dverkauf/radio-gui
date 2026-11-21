@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Display-only Qt Quick prototype. No receiver, audio, backend or user-data I/O."""
+"""Qt Quick radio UI with optional supervised PHP internet playback."""
 from __future__ import annotations
 
 import argparse
@@ -17,7 +17,11 @@ def main() -> int:
     parser.add_argument('--rotation', type=int, choices=[0, 90, 180, 270], default=0,
                         help='Rotate the Qt Quick scene for a physically mounted panel')
     parser.add_argument('--keyboard-test', action='store_true', help='Open the multilingual text-entry test')
+    parser.add_argument('--internet', action='store_true', help='Play saved internet stations through the PHP library')
+    parser.add_argument('--config-dir', type=Path, default=Path.home() / '.radio', help='Existing shared radio data directory')
     args = parser.parse_args()
+    if args.internet and args.keyboard_test:
+        parser.error('--internet and --keyboard-test cannot be combined')
     if args.diagnose:
         from check_environment import report
         import json
@@ -39,18 +43,26 @@ def main() -> int:
         argv += ['-platform', args.platform]
     QQuickStyle.setStyle('Basic')
     app = QGuiApplication(argv)
-    app.setApplicationName('Radio display prototype')
+    app.setApplicationName('La Calma Radio')
     app.setOrganizationName('Radio')
     engine = QQmlApplicationEngine()
     if args.keyboard_test:
         from keyboard_editor import KeyboardEditor
         editor = KeyboardEditor(app)
         engine.rootContext().setContextProperty('keyboardEditor', editor)
+    bridge = None
+    if args.internet:
+        from internet_bridge import InternetBridge
+        bridge = InternetBridge(args.config_dir.resolve(), app)
+        engine.rootContext().setContextProperty('internetBridge', bridge)
+        app.aboutToQuit.connect(bridge.shutdown)
     engine.setInitialProperties({'windowed': args.windowed, 'backendName': app.platformName(),
                                  'contentRotation': args.rotation})
-    scene = 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'
+    scene = 'Internet.qml' if args.internet else 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'
     engine.load(QUrl.fromLocalFile(str(Path(__file__).with_name(scene).resolve())))
     if not engine.rootObjects():
+        if bridge is not None:
+            bridge.shutdown()
         return 1
     engine.quit.connect(app.quit)
     signal.signal(signal.SIGINT, lambda *_: app.quit())
@@ -61,7 +73,8 @@ def main() -> int:
     heartbeat.start(100)
     if args.timeout:
         QTimer.singleShot(args.timeout * 1000, app.quit)
-    print(f'Qt {qVersion()}; platform {app.platformName()}; display-only, no audio.', flush=True)
+    mode = 'internet playback via PHP' if args.internet else 'display-only, no audio'
+    print(f'Qt {qVersion()}; platform {app.platformName()}; {mode}.', flush=True)
     return app.exec()
 
 

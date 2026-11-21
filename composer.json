@@ -1,0 +1,17 @@
+{
+  "name": "dverkauf/radio-gui",
+  "description": "Qt touchscreen radio with a supervised PHP playback bridge",
+  "type": "project",
+  "require": {
+    "php": "^8.4",
+    "ext-json": "*",
+    "ext-pcntl": "*",
+    "dverkauf/radio-lib": "dev-main#306913e"
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/dverkauf/radio-lib.git"
+    }
+  ]
+}
