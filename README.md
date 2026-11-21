@@ -1,8 +1,21 @@
-# Radio display prototype
+# La Calma Radio GUI
 
-An isolated fullscreen display/touch experiment for the Raspberry Pi. It does not
-connect to radio-lib, start audio, open an SDR, or change ~/.radio. Sample station
-names, podcast text and the slider are UI-only. No service or autostart is installed.
+A fullscreen Qt Quick/PySide6 touchscreen application using the PHP radio-lib
+for radio playback. No service or autostart is installed.
+
+- `python3 main.py --radio`: saved FM, DAB+ and Internet station tabs with
+  tap-to-play, switching, volume and metadata. See [radio playback](RADIO-PLAYBACK.md).
+- `python3 main.py --internet`: the earlier internet-only playback screen.
+- `python3 main.py --keyboard-test`: multilingual EN/DE/ES/Hebrew/Greek input
+  experiment. See [keyboard notes](KEYBOARD.md).
+- No playback flag: the original display/touch demonstration, with sample
+  stations and a UI-only slider; this mode does not start radio/audio processes.
+
+The playback backend uses this checkout's Composer dependencies and the existing
+~/.radio configuration/catalogues. Run `composer install` from the committed lock
+and `composer check-platform-reqs`. Never run the application as root.
+
+## Display-prototype reference
 
 ## First check the target
 
@@ -73,5 +86,6 @@ the device; no fixed output connector, rotation or touchscreen path is assumed.
 Python syntax and diagnostic-script execution can be checked without Qt. QML,
 rendering, text shaping and touch require native Qt acceptance; no hardware pass
 is claimed until the Pi results are supplied. This prototype is not a release or
-an existing radio-ui checkout. After display qualification, the next milestone is
-one source connected through a supervised PHP backend with structured local IPC.
+an existing radio-ui checkout. The playback screens connect through the supervised PHP backend described above.
+New source integrations still require the documented native tests and Pi hardware
+checks; display-only checks do not qualify radio playback.

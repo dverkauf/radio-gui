@@ -17,10 +17,11 @@ def main() -> int:
     parser.add_argument('--rotation', type=int, choices=[0, 90, 180, 270], default=90)
     parser.add_argument('--seconds', type=int, default=60)
     parser.add_argument('--keyboard-test', action='store_true')
+    parser.add_argument('--radio', action='store_true')
     parser.add_argument('--internet', action='store_true')
     args = parser.parse_args()
-    if args.internet and args.keyboard_test:
-        parser.error('--internet and --keyboard-test cannot be combined')
+    if (args.internet or args.radio) and args.keyboard_test:
+        parser.error('Playback and --keyboard-test cannot be combined')
     if not 10 <= args.seconds <= 120:
         parser.error('--seconds must be between 10 and 120')
     if os.environ.get('WAYLAND_DISPLAY') or os.environ.get('DISPLAY'):
@@ -61,7 +62,8 @@ def main() -> int:
                 f'{args.seconds + 10}s', sys.executable, str(base / 'main.py'),
                 '--platform', 'eglfs', '--rotation', str(args.rotation), '--timeout', str(args.seconds)]
                 + (['--keyboard-test'] if args.keyboard_test else [])
-                + (['--internet'] if args.internet else []),
+                + (['--internet'] if args.internet else [])
+                + (['--radio'] if args.radio else []),
                 env=env, start_new_session=True)
             return process.wait(timeout=args.seconds + 20)
     except KeyboardInterrupt:

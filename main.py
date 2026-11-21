@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Qt Quick radio UI with optional supervised PHP internet playback."""
+"""Qt Quick radio UI with supervised PHP radio playback."""
 from __future__ import annotations
 
 import argparse
@@ -17,11 +17,12 @@ def main() -> int:
     parser.add_argument('--rotation', type=int, choices=[0, 90, 180, 270], default=0,
                         help='Rotate the Qt Quick scene for a physically mounted panel')
     parser.add_argument('--keyboard-test', action='store_true', help='Open the multilingual text-entry test')
+    parser.add_argument('--radio', action='store_true', help='Play saved FM, DAB+ and internet stations')
     parser.add_argument('--internet', action='store_true', help='Play saved internet stations through the PHP library')
     parser.add_argument('--config-dir', type=Path, default=Path.home() / '.radio', help='Existing shared radio data directory')
     args = parser.parse_args()
-    if args.internet and args.keyboard_test:
-        parser.error('--internet and --keyboard-test cannot be combined')
+    if (args.internet or args.radio) and args.keyboard_test:
+        parser.error('Playback and --keyboard-test cannot be combined')
     if args.diagnose:
         from check_environment import report
         import json
@@ -51,14 +52,15 @@ def main() -> int:
         editor = KeyboardEditor(app)
         engine.rootContext().setContextProperty('keyboardEditor', editor)
     bridge = None
-    if args.internet:
-        from internet_bridge import InternetBridge
-        bridge = InternetBridge(args.config_dir.resolve(), app)
+    if args.internet or args.radio:
+        from playback_bridge import PlaybackBridge
+        bridge = PlaybackBridge(args.config_dir.resolve(), app)
         engine.rootContext().setContextProperty('internetBridge', bridge)
+        engine.rootContext().setContextProperty('radioBridge', bridge)
         app.aboutToQuit.connect(bridge.shutdown)
     engine.setInitialProperties({'windowed': args.windowed, 'backendName': app.platformName(),
                                  'contentRotation': args.rotation})
-    scene = 'Internet.qml' if args.internet else 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'
+    scene = 'Radio.qml' if args.radio else 'Internet.qml' if args.internet else 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'
     engine.load(QUrl.fromLocalFile(str(Path(__file__).with_name(scene).resolve())))
     if not engine.rootObjects():
         if bridge is not None:
@@ -73,7 +75,7 @@ def main() -> int:
     heartbeat.start(100)
     if args.timeout:
         QTimer.singleShot(args.timeout * 1000, app.quit)
-    mode = 'internet playback via PHP' if args.internet else 'display-only, no audio'
+    mode = 'radio playback via PHP' if (args.internet or args.radio) else 'display-only, no audio'
     print(f'Qt {qVersion()}; platform {app.platformName()}; {mode}.', flush=True)
     return app.exec()
 
