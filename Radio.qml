@@ -24,8 +24,6 @@ ApplicationWindow {
     color: "#111922"
     font.family: "DejaVu Sans"
     font.pixelSize: 22
-    Shortcut { sequence: "Escape"; onActivated: Qt.quit() }
-    Shortcut { sequence: "Ctrl+Q"; onActivated: Qt.quit() }
     component TouchButton: Button {
         id: button
         property bool accent: false
@@ -54,7 +52,6 @@ ApplicationWindow {
         }
         Text { x: 146; y: 23; text: "La Calma · Radio"; color: "#f3ddb1"; font.pixelSize: 32; font.bold: true }
         Text { x: 146; y: 68; text: (radioBridge.activeSource ? radioBridge.activeSource.toUpperCase() + " · " : "") + radioBridge.state; color: "#aabcc9"; textFormat: Text.PlainText }
-        TouchButton { x: 1128; y: 25; width: 120; height: 76; text: "Exit"; onClicked: Qt.quit() }
         Row {
             x: 32; y: 120; spacing: 16
             Repeater {

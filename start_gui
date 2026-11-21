@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+GUI_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec /usr/bin/python3 "$GUI_ROOT/gui_control.py" start "$@"

@@ -20,6 +20,7 @@ def main() -> int:
     parser.add_argument('--radio', action='store_true', help='Browse and play saved radio stations and podcast episodes')
     parser.add_argument('--internet', action='store_true', help='Play saved internet stations through the PHP library')
     parser.add_argument('--config-dir', type=Path, default=Path.home() / '.radio', help='Existing shared radio data directory')
+    parser.add_argument('--ready-file', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if (args.internet or args.radio) and args.keyboard_test:
         parser.error('Playback and --keyboard-test cannot be combined')
@@ -82,6 +83,14 @@ def main() -> int:
         if bridge is not None:
             bridge.shutdown()
         return 1
+    if args.ready_file:
+        import json
+        import os
+        def announce_ready():
+            temporary = args.ready_file.with_suffix('.tmp')
+            temporary.write_text(json.dumps({'pid': os.getpid()}))
+            temporary.replace(args.ready_file)
+        QTimer.singleShot(0, announce_ready)
     engine.quit.connect(app.quit)
     signal.signal(signal.SIGINT, lambda *_: app.quit())
     signal.signal(signal.SIGTERM, lambda *_: app.quit())
