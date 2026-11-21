@@ -8,9 +8,29 @@ from PySide6.QtCore import QObject, Property, Signal, Slot, QProcess, QTimer
 class PlaybackBridge(QObject):
     changed = Signal()
     volumeTargetChanged = Signal()
+    catalogueChanged = Signal()
+    episodesChanged = Signal()
 
     def __init__(self, directory, parent=None, *, process_command=None):
         super().__init__(parent)
+        self._subscriptions = []
+        self._episodes = []
+        self._episode_feed = ''
+        self._episode_page = 0
+        self._episode_total = 0
+        self._episode_page_size = 40
+        self._episodes_loading = False
+        self._episode_error = ''
+        self._browse_request = 0
+        self._pending_entry = None
+        self._position = -1.0
+        self._duration = -1.0
+        self._can_pause = False
+        self._can_seek = False
+        self._pause_pending = False
+        self._pause_target = ''
+        self._seek_target = -1.0
+        self._seek_sequence = 0
         self._stations = []
         self._source = 'internet'
         self._active_source = ''
@@ -43,16 +63,94 @@ class PlaybackBridge(QObject):
         self._process.start(command[0], command[1:])
         self._timer.start()
 
-    stations = Property('QVariantList', lambda self: [s for s in self._stations if s['source'] == self._source], notify=changed)
-    source = Property(str, lambda self: self._source, notify=changed)
+    stations = Property('QVariantList', lambda self: [s for s in self._stations if s['source'] == self._source], notify=catalogueChanged)
+    source = Property(str, lambda self: self._source, notify=catalogueChanged)
     activeSource = Property(str, lambda self: self._active_source, notify=changed)
-    catalogueError = Property(str, lambda self: self._catalogue_errors.get(self._source, ''), notify=changed)
+    catalogueError = Property(str, lambda self: self._catalogue_errors.get(self._source, ''), notify=catalogueChanged)
 
     @Slot(str)
     def setSource(self, source):
-        if source in ('fm', 'dab', 'internet') and source != self._source:
+        if source in ('fm', 'dab', 'internet', 'podcast') and source != self._source:
             self._source = source
+            self.catalogueChanged.emit()
             self.changed.emit()
+
+    subscriptions = Property('QVariantList', lambda self: self._subscriptions, notify=catalogueChanged)
+    episodes = Property('QVariantList', lambda self: self._episodes, notify=episodesChanged)
+    episodeFeed = Property(str, lambda self: self._episode_feed, notify=episodesChanged)
+    episodeFeedName = Property(str, lambda self: next((s['name'] for s in self._subscriptions if s['id'] == self._episode_feed), ''), notify=episodesChanged)
+    episodePage = Property(int, lambda self: self._episode_page, notify=episodesChanged)
+    episodeTotal = Property(int, lambda self: self._episode_total, notify=episodesChanged)
+    episodePageSize = Property(int, lambda self: self._episode_page_size, notify=episodesChanged)
+    episodesLoading = Property(bool, lambda self: self._episodes_loading, notify=episodesChanged)
+    episodeError = Property(str, lambda self: self._episode_error, notify=episodesChanged)
+    position = Property(float, lambda self: self._position, notify=changed)
+    duration = Property(float, lambda self: self._duration, notify=changed)
+    seekTarget = Property(float, lambda self: self._seek_target, notify=changed)
+    canPause = Property(bool, lambda self: self._can_pause and self._state in ('playing', 'paused'), notify=changed)
+    canSeek = Property(bool, lambda self: self._can_seek and self._state in ('playing', 'paused'), notify=changed)
+    pausePending = Property(bool, lambda self: self._pause_pending, notify=changed)
+
+    @Slot(str)
+    def openPodcast(self, feed):
+        if not self._closing and any(s['id'] == feed for s in self._subscriptions):
+            self._request_episodes(feed, 0)
+
+    @Slot()
+    def backToSubscriptions(self):
+        self._browse_request += 1
+        self._episode_feed = ''
+        self._episodes = []
+        self._episodes_loading = False
+        self._episode_error = ''
+        self.episodesChanged.emit()
+        self.changed.emit()
+
+    @Slot(int)
+    def episodePageTo(self, page):
+        if self._episode_feed and 0 <= page <= max(0, (self._episode_total - 1) // self._episode_page_size):
+            self._request_episodes(self._episode_feed, page)
+
+    def _request_episodes(self, feed, page):
+        self._browse_request += 1
+        if self._episode_feed != feed:
+            self._episode_total = 0
+        self._episode_feed = feed
+        self._episode_page = page
+        self._episodes = []
+        self._episodes_loading = True
+        self._episode_error = ''
+        self.episodesChanged.emit()
+        self.changed.emit()
+        self._send({'command': 'episodes', 'feed': feed, 'page': page, 'request_id': self._browse_request})
+
+    def _clear_timeline(self):
+        self._can_pause = self._can_seek = self._pause_pending = False
+        self._pause_target = ''
+        self._position = self._duration = self._seek_target = -1.0
+        self._seek_sequence = 0
+
+    @Slot()
+    def togglePause(self):
+        if self.canPause and not self._pause_pending:
+            self._pause_pending = True
+            self._pause_target = 'playing' if self._state == 'paused' else 'paused'
+            self.changed.emit()
+            self._send({'command': 'resume' if self._state == 'paused' else 'pause'})
+
+    @Slot(float)
+    def seekBy(self, delta):
+        import math
+        base = self._seek_target if self._seek_target >= 0 else self._position
+        if not self.canSeek or self._pause_pending or not math.isfinite(delta) or base < 0:
+            return
+        target = max(0.0, base + delta)
+        if self._duration >= 0:
+            target = min(target, self._duration)
+        self._seek_target = target
+        self._seek_sequence += 1
+        self.changed.emit()
+        self._send({'command': 'seek', 'seconds': target, 'request_id': self._seek_sequence})
 
     selectedId = Property(str, lambda self: self._selected_id, notify=changed)
     state = Property(str, lambda self: self._state, notify=changed)
@@ -105,13 +203,18 @@ class PlaybackBridge(QObject):
                     if any(not isinstance(s, dict) or not isinstance(s.get('id'), str)
                            or not isinstance(s.get('name'), str) for s in stations):
                         raise ValueError('Invalid saved station list')
-                    if any(s.get('source', 'internet') not in ('fm', 'dab', 'internet') for s in stations):
+                    if any(s.get('source', 'internet') not in ('fm', 'dab', 'internet', 'podcast') for s in stations):
                         raise ValueError('Invalid station source')
                     if len({s['id'] for s in stations}) != len(stations):
                         raise ValueError('Duplicate station identity')
                     errors = message.get('catalogue_errors', {})
                     if not isinstance(errors, dict) or any(not isinstance(v, str) for v in errors.values()):
                         raise ValueError('Invalid catalogue diagnostics')
+                    subscriptions = message.get('subscriptions', [])
+                    if not isinstance(subscriptions, list) or any(not isinstance(s, dict)
+                        or not isinstance(s.get('id'), str) or not isinstance(s.get('name'), str) for s in subscriptions):
+                        raise ValueError('Invalid podcast subscriptions')
+                    self._subscriptions = subscriptions
                     self._catalogue_errors = errors
                     self._stations = [dict(s, source=s.get('source', 'internet')) for s in stations]
                     self._volume = float(message['volume'])
@@ -119,11 +222,41 @@ class PlaybackBridge(QObject):
                     self._requested_volume = self._volume
                     self.volumeTargetChanged.emit()
                     self._state = 'idle'
+                    self.catalogueChanged.emit()
+                elif kind == 'episodes':
+                    if message.get('request_id') != self._browse_request or message.get('feed') != self._episode_feed:
+                        continue  # A late page must not replace the current browser.
+                    items = message.get('items')
+                    if not isinstance(items, list) or len(items) > 40 or any(not isinstance(s, dict)
+                        or not isinstance(s.get('id'), str) or not isinstance(s.get('name'), str)
+                        or s.get('source') != 'podcast' for s in items):
+                        raise ValueError('Invalid podcast page')
+                    page, total, size = message['page'], message['total'], message['page_size']
+                    if type(page) is not int or type(total) is not int or size != 40 or page < 0 or total < 0:
+                        raise ValueError('Invalid podcast page bounds')
+                    self._episodes = items
+                    self._episode_page, self._episode_total, self._episode_page_size = page, total, size
+                    self._episodes_loading = False
+                    self.episodesChanged.emit()
+                elif kind == 'timeline':
+                    import math
+                    values = [message.get('position'), message.get('duration')]
+                    if any(v is not None and (type(v) not in (int, float) or not math.isfinite(v) or v < 0) for v in values):
+                        raise ValueError('Invalid media position')
+                    self._position, self._duration = [float(v) if v is not None else -1.0 for v in values]
+                    self._can_pause = bool(message.get('can_pause'))
+                    self._can_seek = bool(message.get('can_seek'))
+                    if self._seek_target >= 0 and self._position >= 0 and message.get('seek_request') == self._seek_sequence:
+                        self._seek_target = -1.0
                 elif kind == 'state':
                     if message.get('state') not in ('starting', 'playing', 'paused', 'stopping', 'stopped', 'completed', 'failed'):
                         raise ValueError('Invalid playback state')
                     reported = message['state']
+                    if reported == self._pause_target:
+                        self._pause_pending = False
+                        self._pause_target = ''
                     if reported in ('stopped', 'completed', 'failed'):
+                        self._clear_timeline()
                         self._active_id = None
                         self._stop_requested = False
                         if reported == 'failed':
@@ -135,7 +268,7 @@ class PlaybackBridge(QObject):
                             QTimer.singleShot(0, self._start_pending)
                     else:
                         self._state = 'stopping' if self._stop_requested else reported
-                    self._volume_control = bool(message.get('volume_control')) and self._state == 'playing'
+                    self._volume_control = bool(message.get('volume_control')) and self._state in ('playing', 'paused')
                 elif kind == 'metadata':
                     if not isinstance(message.get('text'), str):
                         raise ValueError('Invalid metadata')
@@ -149,7 +282,27 @@ class PlaybackBridge(QObject):
                         raise ValueError('Invalid volume')
                     self._volume = value
                 elif kind in ('error', 'request_error', 'session_error'):
+                    if kind == 'request_error' and message.get('command') == 'episodes':
+                        if message.get('request_id') == self._browse_request:
+                            self._episode_error = str(message.get('message', 'Cannot read episodes.'))
+                            self._episodes_loading = False
+                            self.episodesChanged.emit()
+                        self.changed.emit()
+                        continue
                     self._error = str(message.get('message', 'Playback failed.'))
+                    if kind == 'request_error':
+                        if message.get('command') in ('pause', 'resume'):
+                            self._pause_pending = False
+                            self._pause_target = ''
+                        if message.get('command') == 'seek' and message.get('request_id') == self._seek_sequence:
+                            self._seek_target = -1.0
+                        if message.get('command') == 'play':
+                            self._active_id = None
+                            self._pending_id = None
+                            self._pending_entry = None
+                            self._selected_id = ''
+                            self._state = 'stopped'
+                            self._clear_timeline()
                     if kind == 'session_error':
                         self._pending_id = None
                         self._selected_id = ''
@@ -186,11 +339,13 @@ class PlaybackBridge(QObject):
     def play(self, identifier):
         if self._closing or self._state in ('connecting', 'failed'):
             return
-        if not any(s['id'] == identifier for s in self._stations):
+        entry = next((s for s in self._stations + self._episodes if s['id'] == identifier), None)
+        if entry is None:
             return
         if identifier == self._active_id and not self._stop_requested:
             return  # A repeated tap must not restart the current stream.
         self._pending_id = identifier
+        self._pending_entry = dict(entry)
         self._selected_id = identifier
         if self._state in ('idle', 'stopped', 'completed'):
             self._start_pending()
@@ -203,13 +358,15 @@ class PlaybackBridge(QObject):
         if self._closing or self._pending_id is None or self._state not in ('idle', 'stopped', 'completed'):
             return
         identifier = self._pending_id
+        selected = self._pending_entry
         self._pending_id = None
+        self._pending_entry = None
         self._active_id = identifier
         self._error = ''
-        selected = next(s for s in self._stations if s['id'] == identifier)
         self._station = selected['name']
         self._active_source = selected['source']
         self._text = ''
+        self._clear_timeline()
         self._state = 'starting'
         self._requested_volume = self._initial_volume
         self.volumeTargetChanged.emit()
@@ -250,6 +407,6 @@ class PlaybackBridge(QObject):
         self._send({'command': 'quit'})
         self._process.closeWriteChannel()
         # On window exit only: allow core's documented bounded cleanup to finish.
-        if self._process.state() != QProcess.NotRunning and not self._process.waitForFinished(8000):
+        if self._process.state() != QProcess.NotRunning and not self._process.waitForFinished(10000):
             import sys
-            print('PHP cleanup exceeded eight seconds; inspect owned playback processes.', file=sys.stderr)
+            print('PHP cleanup exceeded ten seconds; inspect owned playback processes.', file=sys.stderr)

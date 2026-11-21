@@ -17,7 +17,7 @@ def main() -> int:
     parser.add_argument('--rotation', type=int, choices=[0, 90, 180, 270], default=0,
                         help='Rotate the Qt Quick scene for a physically mounted panel')
     parser.add_argument('--keyboard-test', action='store_true', help='Open the multilingual text-entry test')
-    parser.add_argument('--radio', action='store_true', help='Play saved FM, DAB+ and internet stations')
+    parser.add_argument('--radio', action='store_true', help='Browse and play saved radio stations and podcast episodes')
     parser.add_argument('--internet', action='store_true', help='Play saved internet stations through the PHP library')
     parser.add_argument('--config-dir', type=Path, default=Path.home() / '.radio', help='Existing shared radio data directory')
     args = parser.parse_args()

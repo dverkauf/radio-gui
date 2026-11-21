@@ -8,6 +8,8 @@ use Radio\Dab\DabPlaybackSource;
 use Radio\Playback\PlaybackSourceRegistry;
 use Radio\Playback\PlaybackOptions;
 use Radio\Playback\PlaybackVolumeControl;
+use Radio\Podcast\PodcastPlaybackSource;
+use Radio\Podcast\PodcastProgressOptions;
 
 // Dedicated child process. stdout is reserved for protocol messages.
 ini_set('display_errors', 'stderr');
@@ -17,6 +19,8 @@ $input = '';
 $quit = false;
 $lastState = null;
 $lastVolume = null;
+$lastTimelineAt = 0.0;
+$seekRequest = 0;
 $lastContact = microtime(true);
 $exit = 0;
 $emit = static function (array $message) use (&$output): void {
@@ -33,6 +37,7 @@ try {
     }
     require $autoload;
     require __DIR__ . '/SavedRadioStations.php';
+    require __DIR__ . '/SavedPodcasts.php';
     $directory = $argv[1] ?? '';
     if (!str_starts_with($directory, '/') || !is_dir($directory)) {
         throw new RuntimeException('An existing absolute configuration directory is required.');
@@ -55,13 +60,16 @@ try {
         new FmPlaybackSource($config, $directory, $autoload),
         new DabPlaybackSource($config, $directory, $autoload),
         new InternetPlaybackSource($config, $directory, $autoload),
+        new PodcastPlaybackSource($config, $directory, $autoload, new PodcastProgressOptions(enabled: true)),
     ]);
     $saved = SavedRadioStations::load($directory);
     $allowed = array_column($saved['stations'], null, 'id');
+    $podcasts = new SavedPodcasts($directory);
+    if ($podcasts->error() !== null) { $saved['errors']['podcast'] = $podcasts->error(); }
     $emit(['type' => 'ready', 'protocol' => 1, 'stations' => array_map(
         static function (array $s): array { unset($s['selection']); return $s; },
         $saved['stations']
-    ), 'catalogue_errors' => (object) $saved['errors'], 'volume' => $options->volume]);
+    ), 'subscriptions' => $podcasts->summaries(), 'catalogue_errors' => (object) $saved['errors'], 'volume' => $options->volume]);
     $recover = static function (Throwable $error) use (&$session, $emit): void {
         // A cleanup failure remains fatal; never announce receiver availability first.
         $session?->close();
@@ -109,18 +117,50 @@ try {
                 switch ($request['command']) {
                     case 'ping': break;
                     case 'quit': $quit = true; break;
+                    case 'episodes':
+                        $feed = $request['feed'] ?? null;
+                        $page = $request['page'] ?? null;
+                        $requestId = $request['request_id'] ?? null;
+                        if (!is_string($feed) || !is_int($page) || !is_int($requestId) || $requestId < 1) {
+                            throw new InvalidArgumentException('Invalid episode page request.');
+                        }
+                        $emit(['type' => 'episodes', 'request_id' => $requestId] + $podcasts->page($feed, $page));
+                        break;
                     case 'play':
                         if ($session !== null) { throw new LogicException('Stop current playback first.'); }
                         $id = $request['id'] ?? null;
-                        if (!is_string($id) || !isset($allowed[$id])) {
-                            throw new InvalidArgumentException('Choose a saved radio station.');
-                        }
-                        $entry = $allowed[$id];
+                        if (!is_string($id)) { throw new InvalidArgumentException('Choose a saved selection.'); }
+                        $entry = str_starts_with($id, 'podcast/')
+                            ? $podcasts->selection($id)
+                            : ($allowed[$id] ?? throw new InvalidArgumentException('Choose a saved radio station.'));
                         $session = $registry->get($entry['source'])->start($entry['selection'], $options);
+                        $lastTimelineAt = 0.0;
+                        $seekRequest = 0;
                         $lastState = null;
                         $lastVolume = null;
                         break;
                     case 'stop': $session?->requestStop(); break;
+                    case 'pause':
+                    case 'resume':
+                        if ($session === null || !$session->capabilities()->canPause) {
+                            throw new LogicException('Pause/resume is unavailable.');
+                        }
+                        $request['command'] === 'pause' ? $session->pause() : $session->resume();
+                        break;
+                    case 'seek':
+                        if ($session === null || !$session->capabilities()->canSeek) {
+                            throw new LogicException('Seeking is unavailable.');
+                        }
+                        $seconds = $request['seconds'] ?? null;
+                        $sequence = $request['request_id'] ?? null;
+                        if ((!is_int($seconds) && !is_float($seconds)) || !is_finite((float) $seconds)
+                            || $seconds < 0 || !is_int($sequence) || $sequence < 1) {
+                            throw new InvalidArgumentException('Invalid seek position.');
+                        }
+                        $session->seek((float) $seconds);
+                        $seekRequest = $sequence;
+                        $lastTimelineAt = 0.0;
+                        break;
                     case 'volume':
                         if (!$session instanceof PlaybackVolumeControl) {
                             throw new LogicException('Volume is unavailable.');
@@ -134,7 +174,8 @@ try {
                     default: throw new InvalidArgumentException('Unknown GUI command.');
                 }
             } catch (LogicException $error) {
-                $emit(['type' => 'request_error', 'message' => $error->getMessage()]);
+                $emit(['type' => 'request_error', 'message' => $error->getMessage(),
+                    'command' => $request['command'], 'request_id' => $request['request_id'] ?? null]);
             } catch (Throwable $error) {
                 $recover($error);
             }
@@ -160,6 +201,14 @@ try {
                 if ($lastState !== $state->value) {
                     $lastState = $state->value;
                     $emit(['type' => 'state', 'state' => $lastState, 'volume_control' => $volumeControl]);
+                }
+                if ($session !== null && microtime(true) - $lastTimelineAt >= 0.25) {
+                    $caps = $session->capabilities();
+                    $emit(['type' => 'timeline', 'can_pause' => $caps->canPause, 'can_seek' => $caps->canSeek,
+                        'position' => $caps->reportsPosition ? $session->positionSeconds() : null,
+                        'duration' => $caps->reportsDuration ? $session->durationSeconds() : null,
+                        'seek_request' => $seekRequest]);
+                    $lastTimelineAt = microtime(true);
                 }
                 if ($confirmedVolume !== null && $lastVolume !== $confirmedVolume) {
                     $lastVolume = $confirmedVolume;

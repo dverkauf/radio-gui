@@ -9,14 +9,16 @@ import unittest
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 os.environ['QT_QUICK_BACKEND'] = 'software'
-from PySide6.QtCore import QCoreApplication, QProcess
+from PySide6.QtCore import QProcess
+from PySide6.QtGui import QGuiApplication
 from internet_bridge import InternetBridge
 
 
 class BridgeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = QCoreApplication.instance() or QCoreApplication([])
+        cls.app = QGuiApplication.instance() or QGuiApplication([])
+        cls.app.setQuitOnLastWindowClosed(False)
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()

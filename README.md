@@ -3,8 +3,9 @@
 A fullscreen Qt Quick/PySide6 touchscreen application using the PHP radio-lib
 for radio playback. No service or autostart is installed.
 
-- `python3 main.py --radio`: saved FM, DAB+ and Internet station tabs with
-  tap-to-play, switching, volume and metadata. See [radio playback](RADIO-PLAYBACK.md).
+- `python3 main.py --radio`: saved FM, DAB+, Internet and podcast tabs with
+  tap-to-play, switching, volume and metadata. Podcasts add resume, pause and seek. See [radio playback](RADIO-PLAYBACK.md)
+  and [podcasts](PODCAST-GUI.md).
 - `python3 main.py --internet`: the earlier internet-only playback screen.
 - `python3 main.py --keyboard-test`: multilingual EN/DE/ES/Hebrew/Greek input
   experiment. See [keyboard notes](KEYBOARD.md).
