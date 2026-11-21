@@ -102,3 +102,5 @@ DAB+ remembers a configured reception location. See SCANNING.md.
 
 FM identification is separate from saving. Manage presets provides confirmed
 source-specific deletion and podcast unsubscribe. See PRESET-MANAGEMENT.md.
+
+DAB+ scan plans can be edited in the secondary [Reception locations screen](RECEPTION-LOCATIONS.md).

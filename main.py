@@ -75,6 +75,11 @@ def main() -> int:
             engine.rootContext().setContextProperty('presetBridge', presets)
             presets.saved.connect(bridge.refreshCatalogue)
             app.aboutToQuit.connect(presets.shutdown)
+            from location_bridge import LocationBridge
+            locations = LocationBridge(args.config_dir.resolve(), app)
+            engine.rootContext().setContextProperty('locationBridge', locations)
+            locations.saved.connect(scans.refreshLocations)
+            app.aboutToQuit.connect(locations.shutdown)
     engine.setInitialProperties({'windowed': args.windowed, 'backendName': app.platformName(),
                                  'contentRotation': args.rotation})
     scene = 'Radio.qml' if args.radio else 'Internet.qml' if args.internet else 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'

@@ -42,6 +42,11 @@ class ScanBridge(DiscoveryBridge):
         self._items = []
         self._start({'source': source, 'action': 'settings'})
 
+    @Slot()
+    def refreshLocations(self):
+        if not self._busy:
+            self._start({'source': self._source, 'action': 'settings'})
+
     @Slot(str)
     def setLocation(self, name):
         if not self._busy and any(p['name'] == name for p in self._locations):

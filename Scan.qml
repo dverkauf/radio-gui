@@ -28,12 +28,17 @@ Rectangle {
         onClicked: { panel.opened = false; radioBridge.refreshCatalogue() }
     }
     ComboBox {
-        x: 32; y: 96; width: 720; height: 60; visible: panel.source === "dab"
+        x: 32; y: 96; width: 472; height: 60; visible: panel.source === "dab"
         model: scanBridge.locations; textRole: "label"; valueRole: "name"
         currentIndex: { for (var i = 0; i < scanBridge.locations.length; ++i) if (scanBridge.locations[i].name === scanBridge.location) return i; return -1 }
         enabled: !scanBridge.busy
         onActivated: scanBridge.setLocation(currentValue)
         font.pixelSize: 22
+    }
+    Action {
+        x:520; y:96; width:232; height:60; text:"Reception locations…"
+        visible:panel.source==="dab"; enabled:!scanBridge.busy
+        onClicked:reception.open()
     }
     Text {
         x: 32; y: 108; width: 720; height: 50; visible: panel.source === "fm"
@@ -43,8 +48,13 @@ Rectangle {
     Action { x: 768; y: 96; width: 240; height: 60; text: "Start new scan"; enabled: !scanBridge.busy; onClicked: { panel.confirmIndex = -1; scanBridge.scan() } }
     Action { x: 1024; y: 96; width: 224; height: 60; text: scanBridge.cancelling ? "Cleaning up…" : "Cancel"; enabled: scanBridge.busy && !scanBridge.cancelling; onClicked: scanBridge.cancel() }
     Text {
-        x: 32; y: 172; width: 1216; height: 76; text: scanBridge.message
+        x: 32; y: 198; width: 1150; height: 50; text: scanBridge.message
         textFormat: Text.PlainText; wrapMode: Text.WordWrap; color: "#a3e4ca"; font.pixelSize: 19
+    }
+    Text {
+        x:32; y:164; width:1216; height:28; visible:panel.source === "dab"
+        text: { for(var i=0;i<scanBridge.locations.length;++i) if(scanBridge.locations[i].name===scanBridge.location) return "Blocks: " + scanBridge.locations[i].channels.join(", "); return "" }
+        textFormat:Text.PlainText; color:"#aabcc9"; font.pixelSize:16; elide:Text.ElideRight
     }
     BusyIndicator { x: 1192; y: 190; width: 44; height: 44; running: scanBridge.busy }
     ListView {
@@ -81,4 +91,5 @@ Rectangle {
         }
         ScrollBar.vertical: ScrollBar {}
     }
+    ReceptionLocations { id:reception; anchors.fill:parent; z:10 }
 }

@@ -90,3 +90,9 @@ to presets and play. Try a configured DAB location, cancel/retry, inspect block
 services and confirm an explicit block save. Return and play. Check rtl_power,
 rtl_fm, redsea, welle-cli, ffmpeg, pw-play and pw-cli are absent after exit.
 Keep the current mono-service restart counter with the test report.
+
+## Edit reception plans
+
+DAB+ scanning offers a secondary Reception locations screen for named block plans,
+selection and confirmed deletion. See [RECEPTION-LOCATIONS.md](RECEPTION-LOCATIONS.md).
+The selected blocks are shown before scanning; full Band III remains available.
