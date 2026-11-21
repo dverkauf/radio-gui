@@ -47,7 +47,7 @@ def main() -> int:
     app.setApplicationName('La Calma Radio')
     app.setOrganizationName('Radio')
     engine = QQmlApplicationEngine()
-    if args.keyboard_test:
+    if args.keyboard_test or args.radio:
         from keyboard_editor import KeyboardEditor
         editor = KeyboardEditor(app)
         engine.rootContext().setContextProperty('keyboardEditor', editor)
@@ -58,6 +58,12 @@ def main() -> int:
         engine.rootContext().setContextProperty('internetBridge', bridge)
         engine.rootContext().setContextProperty('radioBridge', bridge)
         app.aboutToQuit.connect(bridge.shutdown)
+        if args.radio:
+            from discovery_bridge import DiscoveryBridge
+            discovery = DiscoveryBridge(args.config_dir.resolve(), app)
+            engine.rootContext().setContextProperty('discoveryBridge', discovery)
+            discovery.saved.connect(bridge.refreshCatalogue)
+            app.aboutToQuit.connect(discovery.shutdown)
     engine.setInitialProperties({'windowed': args.windowed, 'backendName': app.platformName(),
                                  'contentRotation': args.rotation})
     scene = 'Radio.qml' if args.radio else 'Internet.qml' if args.internet else 'KeyboardTest.qml' if args.keyboard_test else 'Main.qml'

@@ -116,6 +116,17 @@ try {
             try {
                 switch ($request['command']) {
                     case 'ping': break;
+                    case 'reload':
+                        $newSaved = SavedRadioStations::load($directory);
+                        $newPodcasts = new SavedPodcasts($directory);
+                        if ($newPodcasts->error() !== null) { $newSaved['errors']['podcast'] = $newPodcasts->error(); }
+                        $allowed = array_column($newSaved['stations'], null, 'id');
+                        $podcasts = $newPodcasts;
+                        $emit(['type' => 'catalogue', 'protocol' => 1, 'stations' => array_map(
+                            static function (array $s): array { unset($s['selection']); return $s; },
+                            $newSaved['stations']
+                        ), 'subscriptions' => $podcasts->summaries(), 'catalogue_errors' => (object) $newSaved['errors']]);
+                        break;
                     case 'quit': $quit = true; break;
                     case 'episodes':
                         $feed = $request['feed'] ?? null;
@@ -177,7 +188,11 @@ try {
                 $emit(['type' => 'request_error', 'message' => $error->getMessage(),
                     'command' => $request['command'], 'request_id' => $request['request_id'] ?? null]);
             } catch (Throwable $error) {
-                $recover($error);
+                if ($request['command'] === 'reload') {
+                    $emit(['type' => 'request_error', 'command' => 'reload', 'message' => $error->getMessage()]);
+                } else {
+                    $recover($error);
+                }
             }
         }
         if ($quit) { break; }
@@ -215,7 +230,11 @@ try {
                     $emit(['type' => 'volume', 'value' => $lastVolume]);
                 }
             } catch (Throwable $error) {
-                $recover($error);
+                if ($request['command'] === 'reload') {
+                    $emit(['type' => 'request_error', 'command' => 'reload', 'message' => $error->getMessage()]);
+                } else {
+                    $recover($error);
+                }
             }
         }
     }

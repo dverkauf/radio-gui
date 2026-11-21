@@ -68,6 +68,11 @@ class PlaybackBridge(QObject):
     activeSource = Property(str, lambda self: self._active_source, notify=changed)
     catalogueError = Property(str, lambda self: self._catalogue_errors.get(self._source, ''), notify=catalogueChanged)
 
+    @Slot()
+    def refreshCatalogue(self):
+        if not self._closing and self._state not in ('connecting', 'failed'):
+            self._send({'command': 'reload'})
+
     @Slot(str)
     def setSource(self, source):
         if source in ('fm', 'dab', 'internet', 'podcast') and source != self._source:
@@ -196,7 +201,7 @@ class PlaybackBridge(QObject):
                 if not isinstance(message, dict):
                     raise ValueError('Expected a protocol object')
                 kind = message.get('type')
-                if kind == 'ready':
+                if kind in ('ready', 'catalogue'):
                     if message.get('protocol') != 1 or not isinstance(message.get('stations'), list):
                         raise ValueError('Unsupported playback protocol')
                     stations = message['stations']
@@ -217,11 +222,12 @@ class PlaybackBridge(QObject):
                     self._subscriptions = subscriptions
                     self._catalogue_errors = errors
                     self._stations = [dict(s, source=s.get('source', 'internet')) for s in stations]
-                    self._volume = float(message['volume'])
-                    self._initial_volume = self._volume
-                    self._requested_volume = self._volume
-                    self.volumeTargetChanged.emit()
-                    self._state = 'idle'
+                    if kind == 'ready':
+                        self._volume = float(message['volume'])
+                        self._initial_volume = self._volume
+                        self._requested_volume = self._volume
+                        self.volumeTargetChanged.emit()
+                        self._state = 'idle'
                     self.catalogueChanged.emit()
                 elif kind == 'episodes':
                     if message.get('request_id') != self._browse_request or message.get('feed') != self._episode_feed:

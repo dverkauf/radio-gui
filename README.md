@@ -90,3 +90,11 @@ is claimed until the Pi results are supplied. This prototype is not a release or
 an existing radio-ui checkout. The playback screens connect through the supervised PHP backend described above.
 New source integrations still require the documented native tests and Pi hardware
 checks; display-only checks do not qualify radio playback.
+
+## Secondary discovery
+
+Internet and Podcasts include a smaller Find action below the source tabs.
+Search uses the multilingual touch keyboard. Save a station or subscribe to a
+podcast explicitly, then return to presets to play. Search and subscription
+fetches run in an owned PHP worker alongside playback. See DISCOVERY.md.
+FM/DAB+ scan screens and remembered DAB+ reception regions are the next stage.

@@ -67,6 +67,17 @@ ApplicationWindow {
                 }
             }
         }
+        TouchButton {
+            x: 32; y: 186; width: 280; height: 44
+            visible: !root.episodeBrowser && (radioBridge.source === "internet" || radioBridge.source === "podcast")
+            text: radioBridge.source === "podcast" ? "Find podcasts…" : "Find stations…"
+            onClicked: discovery.open(radioBridge.source)
+        }
+        TouchButton {
+            x: 1040; y: 186; width: 208; height: 44; text: "Refresh presets"
+            visible: !root.episodeBrowser
+            onClicked: radioBridge.refreshCatalogue()
+        }
         Item {
             x: 32; y: 186; width: 1216; height: 44; visible: root.episodeBrowser
             TouchButton { width: 144; height: 44; text: "Back"; onClicked: radioBridge.backToSubscriptions() }
@@ -89,8 +100,8 @@ ApplicationWindow {
         }
         ListView {
             id: stations
-            x: 32; y: root.episodeBrowser ? 238 : 198
-            width: 1216; height: root.episodeBrowser ? 194 : 234; spacing: 12; clip: true
+            x: 32; y: 238
+            width: 1216; height: 194; spacing: 12; clip: true
             model: root.podcastBrowser ? (root.episodeBrowser ? radioBridge.episodes : radioBridge.subscriptions) : radioBridge.stations
             delegate: TouchButton {
                 required property var modelData
@@ -108,8 +119,9 @@ ApplicationWindow {
             text: root.episodeBrowser ? (radioBridge.episodesLoading ? "Loading saved episodes…"
                     : radioBridge.episodeError || "No saved episodes.")
                 : radioBridge.catalogueError !== "" ? "Cannot read saved catalogue: " + radioBridge.catalogueError
-                : root.podcastBrowser ? "No saved podcasts. Subscribe with radio-cli, then reopen this screen."
-                : "No saved " + radioBridge.source.toUpperCase() + " stations. Use radio-cli to scan or save stations, then reopen this screen."
+                : root.podcastBrowser ? "No saved podcasts. Choose Find podcasts to subscribe."
+                : radioBridge.source === "internet" ? "No saved Internet stations. Choose Find stations to add presets."
+                : "No saved " + radioBridge.source.toUpperCase() + " stations. Use radio-cli to scan, then choose Refresh presets."
             textFormat: Text.PlainText
             color: "#aabcc9"; wrapMode: Text.WordWrap
         }
@@ -148,5 +160,6 @@ ApplicationWindow {
             enabled: radioBridge.volumeControl
             onMoved: radioBridge.setVolume(value)
         }
+        Discovery { id: discovery; anchors.fill: parent; z: 20 }
     }
 }
