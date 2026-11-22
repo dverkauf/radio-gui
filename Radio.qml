@@ -49,6 +49,7 @@ ApplicationWindow {
         Rectangle {
             x: 32; y: 16; width: 88; height: 88; radius: 16; color: "#faf6ed"
             Image { anchors.fill: parent; anchors.margins: 6; source: "assets/la-calma.svg"; fillMode: Image.PreserveAspectFit }
+            MouseArea { anchors.fill:parent; onClicked:powerMenu.open() }
         }
         Text { x: 146; y: 23; text: "La Calma · Radio"; color: "#f3ddb1"; font.pixelSize: 32; font.bold: true }
         Text { x: 146; y: 68; text: (radioBridge.activeSource ? radioBridge.activeSource.toUpperCase() + " · " : "") + radioBridge.state; color: "#aabcc9"; textFormat: Text.PlainText }
@@ -163,5 +164,7 @@ ApplicationWindow {
         Discovery { id: discovery; anchors.fill: parent; z: 20 }
         Scan { id: scans; anchors.fill: parent; z: 21 }
         ManagePresets { id: management; anchors.fill: parent; z: 22 }
+        PowerMenu { id:powerMenu; z:100 }
+        StandbyScreen { z:110 }
     }
 }

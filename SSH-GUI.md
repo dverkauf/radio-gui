@@ -68,3 +68,12 @@ It does not start a VNC server or change its authentication/network settings.
 Wayland scene rotation defaults to 0 because the desktop already handles the
 screen's landscape orientation. EGLFS start_gui retains rotation 90. Override
 with --rotation if required. Both modes use the same GUI data and log paths.
+
+## Logo power controls
+
+The main logo opens Standby / Shut down Pi / Cancel. These optional controls need
+one-time `./setup_power_controls` installation; see [POWER-CONTROLS.md](POWER-CONTROLS.md).
+Unlike the SSH launchers themselves, these controls install three exact sudo
+permissions for a root-owned helper snapshot. No arbitrary checkout execution is
+authorized. Standby keeps SSH/VNC available; confirmed shutdown ends all sessions.
+Use `./wake_display` from SSH for backlight recovery. GUI autostart is unchanged.

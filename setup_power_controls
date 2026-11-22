@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec sudo /usr/bin/python3 -I "$base/install_power_controls.py" "$(id -un)"

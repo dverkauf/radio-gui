@@ -107,3 +107,6 @@ DAB+ scan plans can be edited in the secondary [Reception locations screen](RECE
 
 Manage presets also offers **Move up / Move down**, with a remembered order per
 source. See [preset management](PRESET-MANAGEMENT.md#preset-ordering).
+
+Tap the logo for **Standby**, **Shut down Pi**, or **Cancel**. See
+[power controls](POWER-CONTROLS.md) for the one-time helper setup and touch wake.
